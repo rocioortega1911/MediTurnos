@@ -16,11 +16,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registrar los routers de las entidades principales
+# Routers(RUTAS)
+app.include_router(especialidades.router)
 app.include_router(pacientes.router)
 app.include_router(medicos.router)
 app.include_router(turnos.router)
+app.include_router(reportes.router)
 
 @app.get("/", tags=["General"])
 def read_root():
-    return {"status": "ok", "message": "API funcionando correctamente"}
+    return {
+        "status": "ok",
+        "proyecto": "MediTurnos",
+        "database": "MySQL (mediturnos)"
+        }

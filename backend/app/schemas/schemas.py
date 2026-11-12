@@ -1,28 +1,53 @@
 from pydantic import BaseModel, EmailStr, Field
-from datetime import date, time
-from typing import Optional
+from datetime import date, datetime
+from typing import Optional, Literal
 
 # ==========================================
-# ESQUEMAS: PACIENTE
+# 1. ESQUEMAS: ESPECIALIDADES
+# ==========================================
+class EspecialidadBase(BaseModel):
+    nombre: str = Field(..., max_length=100, examples=["Cardiología"])
+    descripcion: Optional[str] = Field(None, max_length=255, examples=["Atención del sistema cardiovascular"])
+
+class EspecialidadCreate(EspecialidadBase):
+    pass
+
+class EspecialidadUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, max_length=100)
+    descripcion: Optional[str] = Field(None, max_length=255)
+
+class EspecialidadResponse(EspecialidadBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+# ==========================================
+# 2. ESQUEMAS: PACIENTES
 # ==========================================
 class PacienteBase(BaseModel):
-    nombre: str = Field(..., min_length=2, max_length=50, examples=["Juan"])
-    apellido: str = Field(..., min_length=2, max_length=50, examples=["Pérez"])
-    dni: str = Field(..., min_length=7, max_length=10, examples=["40123456"])
-    email: EmailStr = Field(..., examples=["juan.perez@email.com"])
-    telefono: Optional[str] = Field(None, examples=["3804123456"])
-    obra_social: Optional[str] = Field("Particular", examples=["OSDE"])
+    usuario_id: Optional[int] = Field(None, examples=[None])
+    dni: str = Field(..., max_length=15, examples=["40123456"])
+    nombre: str = Field(..., max_length=80, examples=["Juan"])
+    apellido: str = Field(..., max_length=80, examples=["Pérez"])
+    fecha_nacimiento: Optional[date] = Field(None, examples=["1998-05-14"])
+    telefono: Optional[str] = Field(None, max_length=25, examples=["3804123456"])
+    email: Optional[EmailStr] = Field(None, examples=["juan.perez@email.com"])
+    direccion: Optional[str] = Field(None, max_length=150, examples=["Av. San Martín 123"])
 
 class PacienteCreate(PacienteBase):
     pass
 
 class PacienteUpdate(BaseModel):
-    nombre: Optional[str] = Field(None, min_length=2, max_length=50)
-    apellido: Optional[str] = Field(None, min_length=2, max_length=50)
-    dni: Optional[str] = Field(None, min_length=7, max_length=10)
+    usuario_id: Optional[int] = None
+    dni: Optional[str] = Field(None, max_length=15)
+    nombre: Optional[str] = Field(None, max_length=80)
+    apellido: Optional[str] = Field(None, max_length=80)
+    fecha_nacimiento: Optional[date] = None
+    telefono: Optional[str] = Field(None, max_length=25)
     email: Optional[EmailStr] = None
-    telefono: Optional[str] = None
-    obra_social: Optional[str] = None
+    direccion: Optional[str] = Field(None, max_length=150)
 
 class PacienteResponse(PacienteBase):
     id: int
@@ -32,24 +57,30 @@ class PacienteResponse(PacienteBase):
 
 
 # ==========================================
-# ESQUEMAS: MÉDICO
+# 3. ESQUEMAS: MÉDICOS
 # ==========================================
 class MedicoBase(BaseModel):
-    nombre: str = Field(..., min_length=2, max_length=50, examples=["María"])
-    apellido: str = Field(..., min_length=2, max_length=50, examples=["Gómez"])
-    matricula: str = Field(..., min_length=3, max_length=20, examples=["MP-1234"])
-    especialidad: str = Field(..., min_length=3, max_length=50, examples=["Cardiología"])
-    email: EmailStr = Field(..., examples=["m.gomez@mediturnos.com"])
+    usuario_id: Optional[int] = Field(None, examples=[None])
+    especialidad_id: int = Field(..., examples=[1])
+    matricula: str = Field(..., max_length=30, examples=["MP-1234"])
+    nombre: str = Field(..., max_length=80, examples=["María"])
+    apellido: str = Field(..., max_length=80, examples=["Gómez"])
+    telefono: Optional[str] = Field(None, max_length=25, examples=["3804998877"])
+    email: Optional[EmailStr] = Field(None, examples=["m.gomez@mediturnos.com"])
+    activo: bool = Field(True, examples=[True])
 
 class MedicoCreate(MedicoBase):
     pass
 
 class MedicoUpdate(BaseModel):
-    nombre: Optional[str] = None
-    apellido: Optional[str] = None
-    matricula: Optional[str] = None
-    especialidad: Optional[str] = None
+    usuario_id: Optional[int] = None
+    especialidad_id: Optional[int] = None
+    matricula: Optional[str] = Field(None, max_length=30)
+    nombre: Optional[str] = Field(None, max_length=80)
+    apellido: Optional[str] = Field(None, max_length=80)
+    telefono: Optional[str] = Field(None, max_length=25)
     email: Optional[EmailStr] = None
+    activo: Optional[bool] = None
 
 class MedicoResponse(MedicoBase):
     id: int
@@ -59,15 +90,16 @@ class MedicoResponse(MedicoBase):
 
 
 # ==========================================
-# ESQUEMAS: TURNO
+# 4. ESQUEMAS: TURNOS
 # ==========================================
+EstadoTurno = Literal['pendiente', 'confirmado', 'cancelado', 'atendido']
+
 class TurnoBase(BaseModel):
     paciente_id: int = Field(..., examples=[1])
     medico_id: int = Field(..., examples=[1])
-    fecha: date = Field(..., examples=["2026-11-20"])
-    hora: time = Field(..., examples=["09:30:00"])
-    motivo: Optional[str] = Field(None, max_length=200, examples=["Control anual"])
-    estado: str = Field("pendiente", examples=["pendiente", "confirmado", "cancelado", "completado"])
+    fecha_hora: datetime = Field(..., examples=["2026-11-20T09:30:00"])
+    motivo: Optional[str] = Field(None, max_length=255, examples=["Consulta general"])
+    estado: EstadoTurno = Field("pendiente", examples=["pendiente"])
 
 class TurnoCreate(TurnoBase):
     pass
@@ -75,13 +107,14 @@ class TurnoCreate(TurnoBase):
 class TurnoUpdate(BaseModel):
     paciente_id: Optional[int] = None
     medico_id: Optional[int] = None
-    fecha: Optional[date] = None
-    hora: Optional[time] = None
-    motivo: Optional[str] = None
-    estado: Optional[str] = None
+    fecha_hora: Optional[datetime] = None
+    motivo: Optional[str] = Field(None, max_length=255)
+    estado: Optional[EstadoTurno] = None
 
 class TurnoResponse(TurnoBase):
     id: int
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

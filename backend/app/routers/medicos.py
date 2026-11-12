@@ -1,52 +1,60 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from typing import List
+from app.database import get_db
+from app.models.models import MedicoModel, EspecialidadModel
 from app.schemas.schemas import MedicoCreate, MedicoUpdate, MedicoResponse
 
-router = APIRouter(
-    prefix="/medicos",
-    tags=["Médicos"]
-)
-
-medicos_db = []
-contador_id = 1
+router = APIRouter(prefix="/medicos", tags=["Médicos"])
 
 @router.get("/", response_model=List[MedicoResponse])
-def obtener_medicos():
-    return medicos_db
+def obtener_medicos(db: Session = Depends(get_db)):
+    return db.query(MedicoModel).all()
 
 @router.get("/{medico_id}", response_model=MedicoResponse)
-def obtener_medico(medico_id: int):
-    for medico in medicos_db:
-        if medico["id"] == medico_id:
-            return medico
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Médico no encontrado")
+def obtener_medico(medico_id: int, db: Session = Depends(get_db)):
+    medico = db.query(MedicoModel).filter(MedicoModel.id == medico_id).first()
+    if not medico:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Médico no encontrado")
+    return medico
 
 @router.post("/", response_model=MedicoResponse, status_code=status.HTTP_201_CREATED)
-def crear_medico(medico: MedicoCreate):
-    global contador_id
-    for m in medicos_db:
-        if m["matricula"] == medico.matricula:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya existe un médico con esa matrícula")
-            
-    nuevo_medico = medico.model_dump()
-    nuevo_medico["id"] = contador_id
-    contador_id += 1
-    medicos_db.append(nuevo_medico)
+def crear_medico(medico: MedicoCreate, db: Session = Depends(get_db)):
+    if not db.query(EspecialidadModel).filter(EspecialidadModel.id == medico.especialidad_id).first():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="La especialidad indicada no existe")
+    if db.query(MedicoModel).filter(MedicoModel.matricula == medico.matricula).first():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ya existe un médico con esa matrícula")
+        
+    nuevo_medico = MedicoModel(**medico.model_dump())
+    db.add(nuevo_medico)
+    db.commit()
+    db.refresh(nuevo_medico)
     return nuevo_medico
 
 @router.put("/{medico_id}", response_model=MedicoResponse)
-def actualizar_medico(medico_id: int, datos: MedicoUpdate):
-    for index, medico in enumerate(medicos_db):
-        if medico["id"] == medico_id:
-            datos_actualizados = datos.model_dump(exclude_unset=True)
-            medicos_db[index].update(datos_actualizados)
-            return medicos_db[index]
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Médico no encontrado")
+def actualizar_medico(medico_id: int, datos: MedicoUpdate, db: Session = Depends(get_db)):
+    medico = db.query(MedicoModel).filter(MedicoModel.id == medico_id).first()
+    if not medico:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Médico no encontrado")
+    for key, value in datos.model_dump(exclude_unset=True).items():
+        setattr(medico, key, value)
+    db.commit()
+    db.refresh(medico)
+    return medico
 
 @router.delete("/{medico_id}", status_code=status.HTTP_204_NO_CONTENT)
-def eliminar_medico(medico_id: int):
-    for index, medico in enumerate(medicos_db):
-        if medico["id"] == medico_id:
-            medicos_db.pop(index)
-            return
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Médico no encontrado")
+def eliminar_medico(medico_id: int, db: Session = Depends(get_db)):
+    medico = db.query(MedicoModel).filter(MedicoModel.id == medico_id).first()
+    if not medico:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Médico no encontrado")
+    try:
+        db.delete(medico)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede eliminar el médico porque tiene turnos asociados"
+        )
+    return
