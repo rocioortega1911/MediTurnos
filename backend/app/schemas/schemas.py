@@ -118,3 +118,31 @@ class TurnoResponse(TurnoBase):
 
     class Config:
         from_attributes = True
+
+        # ==========================================
+# 5. ESQUEMAS: USUARIOS Y AUTENTICACIÓN (JWT)
+# ==========================================
+RolUsuario = Literal['administrador', 'recepcionista', 'medico', 'paciente']
+
+class UsuarioCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=50, examples=["admin_medi"])
+    email: EmailStr = Field(..., examples=["admin@mediturnos.com"])
+    password: str = Field(..., min_length=6, max_length=72, examples=["Admin1234"])
+    rol: RolUsuario = Field("paciente", examples=["administrador"])
+
+class UsuarioResponse(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    rol: RolUsuario
+    activo: bool
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    rol: str
+    username: str

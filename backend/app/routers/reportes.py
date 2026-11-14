@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.database import get_db
 
@@ -8,11 +8,8 @@ router = APIRouter(
     tags=["Reportes y Consultas SQL (Punto 3)"]
 )
 
-# =========================================================================
-# CONSULTA 1: INNER JOIN (4 tablas: turnos + pacientes + medicos + especialidades)
-# =========================================================================
 @router.get("/turnos-detallados", summary="1. Consulta con INNER JOIN")
-def obtener_turnos_detallados(db: Session = Depends(get_db)):
+async def obtener_turnos_detallados(db: AsyncSession = Depends(get_db)):
     sql = text("""
         SELECT 
             t.id AS turno_id,
@@ -30,15 +27,11 @@ def obtener_turnos_detallados(db: Session = Depends(get_db)):
         INNER JOIN especialidades e ON m.especialidad_id = e.id
         ORDER BY t.fecha_hora ASC
     """)
-    return db.execute(sql).mappings().all()
+    result = await db.execute(sql)
+    return result.mappings().all()
 
-
-# =========================================================================
-# CONSULTA 2: GROUP BY + INNER JOIN
-# Cantidad de turnos agrupados por Especialidad y Estado
-# =========================================================================
 @router.get("/estadisticas-por-especialidad", summary="2. Consulta con GROUP BY + INNER JOIN")
-def estadisticas_por_especialidad(db: Session = Depends(get_db)):
+async def estadisticas_por_especialidad(db: AsyncSession = Depends(get_db)):
     sql = text("""
         SELECT 
             e.id AS especialidad_id,
@@ -54,15 +47,11 @@ def estadisticas_por_especialidad(db: Session = Depends(get_db)):
         GROUP BY e.id, e.nombre
         ORDER BY total_turnos DESC
     """)
-    return db.execute(sql).mappings().all()
+    result = await db.execute(sql)
+    return result.mappings().all()
 
-
-# =========================================================================
-# CONSULTA 3: SUBCONSULTA (Subquery) + GROUP BY + INNER JOIN
-# Médicos cuya cantidad de turnos supera o iguala el promedio general
-# =========================================================================
 @router.get("/medicos-alta-demanda", summary="3. Consulta con SUBCONSULTA (Subquery)")
-def obtener_medicos_alta_demanda(db: Session = Depends(get_db)):
+async def obtener_medicos_alta_demanda(db: AsyncSession = Depends(get_db)):
     sql = text("""
         SELECT 
             m.id AS medico_id,
@@ -84,4 +73,5 @@ def obtener_medicos_alta_demanda(db: Session = Depends(get_db)):
         )
         ORDER BY total_turnos DESC
     """)
-    return db.execute(sql).mappings().all()
+    result = await db.execute(sql)
+    return result.mappings().all()
